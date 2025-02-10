@@ -256,7 +256,7 @@ cd talos-gcp-deployment
 We need to download two deployment manifests for the deployment from the Talos github repository.
 
 ```bash
-curl -fsSLO "https://raw.githubusercontent.com/siderolabs/talos/master/website/content/{{< version >}}/talos-guides/install/cloud-platforms/gcp/config.yaml"
+curl -fsSLO "https://raw.githubusercontent.com/siderolabs/talos/master/website/content/{{< version >}}/talos-guides/install/cloud-platforms/gcp/config-template.yaml -O config.yaml"
 curl -fsSLO "https://raw.githubusercontent.com/siderolabs/talos/master/website/content/{{< version >}}/talos-guides/install/cloud-platforms/gcp/talos-ha.jinja"
 # if using ccm
 curl -fsSLO "https://raw.githubusercontent.com/siderolabs/talos/master/website/content/{{< version >}}/talos-guides/install/cloud-platforms/gcp/gcp-ccm.yaml"
@@ -266,35 +266,13 @@ curl -fsSLO "https://raw.githubusercontent.com/siderolabs/talos/master/website/c
 
 Now we need to update the local `config.yaml` file with any required changes such as changing the default zone, Talos version, machine sizes, nodes count etc.
 
-An example `config.yaml` file is shown below:
-
-```yaml
-imports:
-  - path: talos-ha.jinja
-
-resources:
-  - name: talos-ha
-    type: talos-ha.jinja
-    properties:
-      zone: us-west1-b
-      talosVersion: {{< release >}}
-      externalCloudProvider: false
-      controlPlaneNodeCount: 5
-      controlPlaneNodeType: n1-standard-1
-      workerNodeCount: 3
-      workerNodeType: n1-standard-1
-outputs:
-  - name: bucketName
-    value: $(ref.talos-ha.bucketName)
-```
-
 #### Enabling external cloud provider
 
 Note: The `externalCloudProvider` property is set to `false` by default.
 The [manifest](https://raw.githubusercontent.com/siderolabs/talos/master/website/content/{{< version >}}/cloud-platforms/gcp/gcp-ccm.yaml#L256) used for deploying the ccm (cloud controller manager) is currently using the GCP ccm provided by openshift since there are no public images for the [ccm](https://github.com/kubernetes/cloud-provider-gcp) yet.
 
 > Since the routes controller is disabled while deploying the CCM, the CNI pods needs to be restarted after the CCM deployment is complete to remove the `node.kubernetes.io/network-unavailable` taint.
-See [Nodes network-unavailable taint not removed after installing ccm](https://github.com/kubernetes/cloud-provider-gcp/issues/291) for more information
+> See [Nodes network-unavailable taint not removed after installing ccm](https://github.com/kubernetes/cloud-provider-gcp/issues/291) for more information
 
 Use a custom built image for the ccm deployment if required.
 
@@ -307,7 +285,7 @@ Run the following command to create the deployment:
 ```bash
 # use a unique name for the deployment, resources are prefixed with the deployment name
 export DEPLOYMENT_NAME="<deployment name>"
-gcloud deployment-manager deployments create "${DEPLOYMENT_NAME}" --config config.yaml
+make create
 ```
 
 ### Retrieving the outputs
