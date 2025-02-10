@@ -16,8 +16,8 @@ resources:
       args:
         - -m
         - cp
-        - gcp-amd64.tar.gz
-        - gs://$(ref.{{ env["deployment"] }}-talos-assets.name)/gcp-amd64.tar.gz
+        - gcp-amd64.raw.tar.gz
+        - gs://$(ref.{{ env["deployment"] }}-talos-assets.name)/gcp-amd64.raw.tar.gz
     timeout: 120s
 - type: compute.v1.image
   name: {{ env["deployment"] }}-talos-image
@@ -26,7 +26,7 @@ resources:
     - create-talos-artifact
   properties:
     rawDisk:
-      source: https://storage.cloud.google.com/$(ref.{{ env["deployment"] }}-talos-assets.name)/gcp-amd64.tar.gz
+      source: https://storage.cloud.google.com/$(ref.{{ env["deployment"] }}-talos-assets.name)/gcp-amd64.raw.tar.gz
     sourceType: RAW
     description: Talos image
     family: talos
@@ -191,16 +191,16 @@ resources:
     - name: alpine
       args:
         - /bin/sh
-        - -ec
+        - -ecx
         - |
           chmod +x talosctl-linux-amd64 && \
           mv talosctl-linux-amd64 /usr/local/bin/talosctl && \
           mkdir -p generated && \
-          talosctl gen config \
+          talosctl gen config && \
             {{ env["deployment"] }} \
             https://$(ref.{{ env["deployment"] }}-talos-lb-ip.address):443 \
             {% if properties["externalCloudProvider"] %} --config-patch '[{"op": "add", "path": "/cluster/externalCloudProvider", "value": {"enabled": true}}]' \{% endif %}
-            --output-dir generated/ && \
+            --output-dir generated/ 
 {% for index in range(properties["controlPlaneNodeCount"]) %}
           echo "applying config for {{ env["deployment"] }}-talos-controlplane-{{ index }}" && \
           talosctl apply-config \
@@ -217,8 +217,23 @@ resources:
             --endpoints $(ref.{{ env["deployment"] }}-talos-worker-{{ index }}.networkInterfaces[0].accessConfigs[0].natIP) \
             --file generated/worker.yaml && \
 {% endfor %}
+    - name: gcr.io/cloud-builders/gsutil
+      args:
+        - -m
+        - cp
+        - -r
+        - generated
+        - gs://$(ref.{{ env["deployment"] }}-talos-assets.name)/
+    - name: alpine
+      args:
+        - /bin/sh
+        - -ecx
+        - |
+          chmod +x talosctl-linux-amd64 && \
+          mv talosctl-linux-amd64 /usr/local/bin/talosctl && \
+          mkdir -p generated && \
           # wait before bootstrapping
-          wait_count=120
+          wait_count=240
           until nc -vzw 3 $(ref.{{ env["deployment"] }}-talos-controlplane-0.networkInterfaces[0].accessConfigs[0].natIP) 50000; do
             echo "Waiting for talos-controlplane-0 to be ready for bootstrap"
             wait_count=$((wait_count=wait_count-1))
@@ -265,18 +280,11 @@ resources:
             --talosconfig generated/talosconfig \
             config node \
             {% for index in range(properties["controlPlaneNodeCount"]) %}$(ref.{{ env["deployment"] }}-talos-controlplane-{{ index }}.networkInterfaces[0].accessConfigs[0].natIP){% if not loop.last %} {% endif %}{% endfor %} {% for index in range(properties["workerNodeCount"]) %}$(ref.{{ env["deployment"] }}-talos-worker-{{ index }}.networkInterfaces[0].accessConfigs[0].natIP){% if not loop.last %} {% endif %}{% endfor %}
-    - name: gcr.io/cloud-builders/gsutil
-      args:
-        - -m
-        - cp
-        - -r
-        - generated
-        - gs://$(ref.{{ env["deployment"] }}-talos-assets.name)/
     timeout: 360s
 outputs:
 - name: bucketName
-  value: $(ref.{{ env["deployment"] }}-talos-assets.name)
+  value: {{ env["deployment"] }}-talos-assets
 - name: serviceAccount
-  value: $(ref.{{ env["deployment"] }}-ccm-sa.email)
+  value: {{ env["deployment"] }}-ccm-sa
 - name: project
   value: {{ env["project"] }}

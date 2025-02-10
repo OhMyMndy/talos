@@ -6,8 +6,8 @@ resources:
     type: talos-ha.jinja
     properties:
       zone: us-west1-b
-      talosVersion: v0.13.3
-      externalCloudProvider: false
+      talosVersion: v1.9.3
+      externalCloudProvider: true
       controlPlaneNodeCount: 3
       controlPlaneNodeType: n1-standard-1
       workerNodeCount: 1
